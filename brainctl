@@ -1,0 +1,571 @@
+#!/usr/bin/env bash
+# brainctl — knowledge management CLI
+# See brain-system-v2.md for full documentation.
+
+set -e
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+BRAIN_GLOBAL="${BRAIN_GLOBAL:-$HOME/Programming/brain}"
+BRAIN_ROOT="${BRAIN_ROOT:-$(pwd)}"
+BRAIN_PUBLIC="${BRAIN_PUBLIC:-}"
+BRAIN_CONTEXT="${BRAIN_CONTEXT:-unknown}"
+BRAIN_REPO="${BRAIN_REPO:-unknown}"
+
+CMD="${1:-}"
+shift || true
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+slugify() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-'
+}
+
+brain_dir() {
+  echo "$1/.brain"
+}
+
+investigations_dir() {
+  echo "$1/.brain/investigations"
+}
+
+index_file() {
+  echo "$1/.brain/INDEX.md"
+}
+
+ensure_structure() {
+  local base="$1"
+  mkdir -p "$(investigations_dir "$base")"
+  local idx
+  idx="$(index_file "$base")"
+  if [ ! -f "$idx" ]; then
+    printf '| Date | File | Summary | Tags | Context | Repo | Status |\n' > "$idx"
+    printf '|------|------|---------|------|---------|------|--------|\n' >> "$idx"
+  fi
+}
+
+ai_summarize() {
+  local input="$1"
+  if command -v llm >/dev/null 2>&1; then
+    local summary tags
+    summary=$(echo "$input" | llm "Summarize in one short sentence. Reply with only the sentence.")
+    tags=$(echo "$input" | llm "Extract 3-5 short tags relevant to a homelab/infra context, comma separated. Reply with only the tags.")
+    echo "${summary}|||${tags}"
+  else
+    echo "manual-summary|||manual"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# init
+# ---------------------------------------------------------------------------
+cmd_init() {
+  local global_path=""
+  local project_type=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --global)    global_path="$2"; shift ;;
+      --global=*)  global_path="${1#--global=}" ;;
+      --type)      project_type="$2"; shift ;;
+      --type=*)    project_type="${1#--type=}" ;;
+      *)
+        echo "Unknown option: $1" >&2
+        echo "Usage: brainctl init [--global <path>] [--type private|split-private|split-public]" >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+
+  local base
+  if [ -n "$global_path" ]; then
+    base="$(mkdir -p "$global_path" && cd "$global_path" && pwd)"
+    echo "Initializing global brain at: $base"
+  else
+    base="$(pwd)"
+    echo "Initializing brain in: $base"
+  fi
+
+  ensure_structure "$base"
+
+  # AGENT.md
+  if [ ! -f "$base/.brain/AGENT.md" ]; then
+    cat > "$base/.brain/AGENT.md" <<'AGENT'
+# Agent Instructions — [REPO NAME]
+
+This file extends the global instructions at `~/Programming/programs/brain/.brain/AGENT.md`.
+
+---
+
+## Repo Context
+
+- **BRAIN_CONTEXT**: dev
+- **BRAIN_REPO**: [repo name]
+- **Purpose**: [brief description]
+
+---
+
+## Repo-Specific Rules
+
+<!-- Add rules specific to this repo here -->
+AGENT
+    echo "Created: $base/.brain/AGENT.md"
+  fi
+
+  # constraints.md
+  if [ ! -f "$base/.brain/constraints.md" ]; then
+    cat > "$base/.brain/constraints.md" <<'CONSTRAINTS'
+# Constraints — [REPO NAME]
+
+| Constraint | Notes |
+|------------|-------|
+CONSTRAINTS
+    echo "Created: $base/.brain/constraints.md"
+  fi
+
+  # known-mistakes.md
+  if [ ! -f "$base/.brain/known-mistakes.md" ]; then
+    cat > "$base/.brain/known-mistakes.md" <<'MISTAKES'
+# Known Mistakes — [REPO NAME]
+
+| Symptom | Context | Avoid | Instead |
+|---------|---------|-------|---------|
+MISTAKES
+    echo "Created: $base/.brain/known-mistakes.md"
+  fi
+
+  # docs/
+  mkdir -p "$base/docs/decisions" "$base/docs/runbooks"
+  echo "Created: $base/docs/decisions/ and $base/docs/runbooks/"
+
+  # .envrc template
+  if [ -n "$project_type" ] && [ ! -f "$base/.envrc" ]; then
+    case "$project_type" in
+      private)
+        cat > "$base/.envrc" <<'ENVRC'
+# Brain system environment — fully private repo
+# Run: direnv allow
+
+export BRAIN_GLOBAL=~/Programming/programs/brain
+export BRAIN_ROOT=$(pwd)
+export BRAIN_PUBLIC=""
+export BRAIN_CONTEXT=dev
+export BRAIN_REPO=my-repo  # replace with your repo name
+ENVRC
+        ;;
+      split-private)
+        cat > "$base/.envrc" <<'ENVRC'
+# Brain system environment — private directory of a split project
+# Run: direnv allow
+
+export BRAIN_GLOBAL=~/Programming/programs/brain
+export BRAIN_ROOT=$(pwd)
+export BRAIN_PUBLIC=$(pwd)/../public   # public sibling directory
+export BRAIN_CONTEXT=dev
+export BRAIN_REPO=my-project           # replace with your project name
+ENVRC
+        ;;
+      split-public)
+        cat > "$base/.envrc" <<'ENVRC'
+# Brain system environment — public directory of a split project
+# Run: direnv allow
+
+export BRAIN_GLOBAL=~/Programming/programs/brain
+export BRAIN_ROOT=$(pwd)/../private    # ALL captures go to private brain
+export BRAIN_PUBLIC=$(pwd)
+export BRAIN_CONTEXT=dev
+export BRAIN_REPO=my-project           # replace with your project name
+ENVRC
+        ;;
+      *)
+        echo "Unknown type: $project_type. Valid types: private, split-private, split-public" >&2
+        ;;
+    esac
+    if [ -f "$base/.envrc" ]; then
+      echo "Created: $base/.envrc (type: $project_type)"
+    fi
+  fi
+
+  echo ""
+  echo "Brain initialized at: $base"
+  echo ""
+
+  if [ -n "$global_path" ]; then
+    echo "Next steps:"
+    echo "  1. Set BRAIN_GLOBAL=$base in your project .envrc files"
+    echo "  2. cd <your-project> && brainctl init [--type private|split-private|split-public]"
+  else
+    echo "Next steps:"
+    echo "  1. Edit .brain/AGENT.md — fill in BRAIN_REPO and repo-specific rules"
+    if [ -f "$base/.envrc" ]; then
+      echo "  2. Edit .envrc — set BRAIN_REPO and verify paths"
+      echo "  3. Run: direnv allow"
+    else
+      echo "  2. Create .envrc (run: brainctl init --type private|split-private|split-public)"
+    fi
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# capture
+# ---------------------------------------------------------------------------
+cmd_capture() {
+  local global=false
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in
+      --global) global=true ;;
+      *) args+=("$arg") ;;
+    esac
+  done
+
+  local task="${args[*]}"
+  if [ -z "$task" ]; then
+    echo "Usage: brainctl capture [--global] \"task name\"" >&2
+    exit 1
+  fi
+
+  local base
+  if $global; then
+    base="$BRAIN_GLOBAL"
+  else
+    base="$BRAIN_ROOT"
+  fi
+
+  ensure_structure "$base"
+
+  local date slug file
+  date=$(date +%F)
+  slug=$(slugify "$task")
+  file="$(investigations_dir "$base")/${date}-${slug}.md"
+
+  cat > "$file" <<EOF
+# Task: $task
+
+## Status
+raw
+
+## Source Repo
+$BRAIN_REPO
+
+## Context
+$BRAIN_CONTEXT
+
+## What was attempted
+
+## What worked
+
+## What failed
+
+## Wrong assumptions
+
+## Reusable insights
+
+## Candidate for promotion
+EOF
+
+  local ai_result summary tags
+  ai_result=$(ai_summarize "$task")
+  summary=$(echo "$ai_result" | cut -d'|' -f1)
+  tags=$(echo "$ai_result" | cut -d'|' -f4)
+
+  local rel_file="${date}-${slug}.md"
+  echo "| ${date} | ${rel_file} | ${summary} | ${tags} | ${BRAIN_CONTEXT} | ${BRAIN_REPO} | raw |" >> "$(index_file "$base")"
+
+  echo "Created: $file"
+  if command -v llm >/dev/null 2>&1; then
+    echo "Summary: $summary"
+    echo "Tags:    $tags"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# preflight
+# ---------------------------------------------------------------------------
+cmd_preflight() {
+  local query="$*"
+  if [ -z "$query" ]; then
+    echo "Usage: brainctl preflight \"query\"" >&2
+    exit 1
+  fi
+
+  local found=false
+
+  # 1. Local scoped search
+  local local_idx
+  local_idx="$(index_file "$BRAIN_ROOT")"
+  if [ -f "$local_idx" ]; then
+    local local_matches
+    local_matches=$(grep -i "$query" "$local_idx" | grep -i "$BRAIN_CONTEXT" | grep -i "$BRAIN_REPO" || true)
+    if [ -n "$local_matches" ]; then
+      found=true
+      echo "## Local matches (context: $BRAIN_CONTEXT, repo: $BRAIN_REPO)"
+      echo "$local_matches"
+      echo ""
+
+      if command -v llm >/dev/null 2>&1; then
+        echo "## AI Insight (local)"
+        local files content
+        files=$(echo "$local_matches" | awk -F'|' '{print $3}' | tr -d ' ')
+        content=$(for f in $files; do
+          local fpath
+          fpath="$(investigations_dir "$BRAIN_ROOT")/$f"
+          [ -f "$fpath" ] && cat "$fpath"
+        done)
+        if [ -n "$content" ]; then
+          echo "$content" | llm "Given this history, what should I consider before: $query"
+        fi
+        echo ""
+      fi
+    fi
+  fi
+
+  # 2. Global fallthrough (always search global, filtered by context)
+  local global_idx
+  global_idx="$(index_file "$BRAIN_GLOBAL")"
+  if [ -f "$global_idx" ]; then
+    local global_matches
+    global_matches=$(grep -i "$query" "$global_idx" | grep -i "$BRAIN_CONTEXT" || true)
+    if [ -n "$global_matches" ]; then
+      found=true
+      echo "## Global matches (context: $BRAIN_CONTEXT)"
+      echo "$global_matches"
+      echo ""
+
+      if command -v llm >/dev/null 2>&1; then
+        echo "## AI Insight (global)"
+        local files content
+        files=$(echo "$global_matches" | awk -F'|' '{print $3}' | tr -d ' ')
+        content=$(for f in $files; do
+          local fpath
+          fpath="$(investigations_dir "$BRAIN_GLOBAL")/$f"
+          [ -f "$fpath" ] && cat "$fpath"
+        done)
+        if [ -n "$content" ]; then
+          echo "$content" | llm "Given this global history, what should I consider before: $query"
+        fi
+      fi
+    fi
+  fi
+
+  if ! $found; then
+    echo "No past investigations found for: $query"
+    echo "Context: $BRAIN_CONTEXT | Repo: $BRAIN_REPO"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# list
+# ---------------------------------------------------------------------------
+cmd_list() {
+  local global=false
+  local filter_tag=""
+  local filter_status=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --global)        global=true ;;
+      --tag)           filter_tag="$2"; shift ;;
+      --tag=*)         filter_tag="${1#--tag=}" ;;
+      --status)        filter_status="$2"; shift ;;
+      --status=*)      filter_status="${1#--status=}" ;;
+    esac
+    shift
+  done
+
+  local base
+  if $global; then
+    base="$BRAIN_GLOBAL"
+    echo "## Global brain index"
+  else
+    base="$BRAIN_ROOT"
+    echo "## Local brain index (repo: $BRAIN_REPO, context: $BRAIN_CONTEXT)"
+  fi
+
+  local idx
+  idx="$(index_file "$base")"
+
+  if [ ! -f "$idx" ]; then
+    echo "No index found at $idx"
+    return
+  fi
+
+  local output
+  output=$(cat "$idx")
+
+  if [ -n "$filter_tag" ]; then
+    output=$(echo "$output" | head -2; echo "$output" | tail -n +3 | grep -i "$filter_tag" || true)
+  fi
+
+  if [ -n "$filter_status" ]; then
+    output=$(echo "$output" | head -2; echo "$output" | tail -n +3 | grep -i "$filter_status" || true)
+  fi
+
+  echo "$output"
+}
+
+# ---------------------------------------------------------------------------
+# promote
+# ---------------------------------------------------------------------------
+cmd_promote() {
+  local file="$1"
+  if [ -z "$file" ] || [ ! -f "$file" ]; then
+    echo "Usage: brainctl promote <investigation-file>" >&2
+    exit 1
+  fi
+
+  echo "Opening $file for review..."
+  ${EDITOR:-vi} "$file"
+
+  echo ""
+  echo "Promote to:"
+  echo "  1) Local .brain/known-mistakes.md"
+  echo "  2) Local .brain/constraints.md"
+  echo "  3) Global brain (~/Programming/programs/brain/.brain/)"
+  echo "  4) docs/decisions/"
+  echo "  5) docs/runbooks/"
+  echo "  q) Cancel"
+  printf "Choice: "
+  read -r choice
+
+  local target_file=""
+  case "$choice" in
+    1) target_file="$BRAIN_ROOT/.brain/known-mistakes.md" ;;
+    2) target_file="$BRAIN_ROOT/.brain/constraints.md" ;;
+    3) target_file="$BRAIN_GLOBAL/.brain/known-mistakes.md" ;;
+    4)
+      local slug
+      slug=$(slugify "$(basename "$file" .md)")
+      target_file="$BRAIN_ROOT/docs/decisions/${slug}-decision.md"
+      mkdir -p "$BRAIN_ROOT/docs/decisions"
+      ;;
+    5)
+      local slug
+      slug=$(slugify "$(basename "$file" .md)")
+      target_file="$BRAIN_ROOT/docs/runbooks/${slug}-runbook.md"
+      mkdir -p "$BRAIN_ROOT/docs/runbooks"
+      ;;
+    q|Q) echo "Cancelled."; return ;;
+    *) echo "Invalid choice."; return ;;
+  esac
+
+  echo ""
+  echo "Opening $target_file alongside investigation..."
+  echo "Copy relevant content manually, then save and close."
+  ${EDITOR:-vi} "$target_file"
+
+  # Update status in local index
+  local basename
+  basename=$(basename "$file")
+  local idx
+  idx="$(index_file "$BRAIN_ROOT")"
+  if [ -f "$idx" ]; then
+    sed -i "s|${basename}\(.*\)raw|${basename}\1promoted|" "$idx" 2>/dev/null || true
+  fi
+
+  # Update status in file
+  sed -i 's/^raw$/promoted/' "$file" 2>/dev/null || true
+
+  echo "Promoted: $file → $target_file"
+}
+
+# ---------------------------------------------------------------------------
+# publish
+# ---------------------------------------------------------------------------
+cmd_publish() {
+  local file="$1"
+  if [ -z "$file" ] || [ ! -f "$file" ]; then
+    echo "Usage: brainctl publish <investigation-file>" >&2
+    exit 1
+  fi
+
+  if [ -z "$BRAIN_PUBLIC" ]; then
+    echo "Error: BRAIN_PUBLIC is not set. This project has no public brain." >&2
+    echo "Set BRAIN_PUBLIC in your .envrc to enable publishing." >&2
+    exit 1
+  fi
+
+  ensure_structure "$BRAIN_PUBLIC"
+
+  echo "IMPORTANT: Review this file for sensitive content before publishing."
+  echo "Remove any secrets, internal IPs, credentials, or private details."
+  echo ""
+  echo "Opening file for sanitization review..."
+  ${EDITOR:-vi} "$file"
+
+  printf "Publish this file to %s? [y/N] " "$BRAIN_PUBLIC"
+  read -r confirm
+  if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+    echo "Cancelled."
+    return
+  fi
+
+  local dest_dir
+  dest_dir="$(investigations_dir "$BRAIN_PUBLIC")"
+  local basename
+  basename=$(basename "$file")
+  cp "$file" "$dest_dir/$basename"
+
+  # Add entry to public index
+  local date summary tags
+  date=$(grep -m1 '^# Task:' "$file" | cut -d: -f1 | awk '{print $NF}' || date +%F)
+  date=$(date +%F)
+  local task_name
+  task_name=$(grep -m1 '^# Task:' "$file" | sed 's/^# Task: //')
+  local ai_result
+  ai_result=$(ai_summarize "$task_name")
+  summary=$(echo "$ai_result" | cut -d'|' -f1)
+  tags=$(echo "$ai_result" | cut -d'|' -f4)
+
+  echo "| ${date} | ${basename} | ${summary} | ${tags} | ${BRAIN_CONTEXT} | ${BRAIN_REPO} | published |" >> "$(index_file "$BRAIN_PUBLIC")"
+
+  # Update status in private index
+  local private_idx
+  private_idx="$(index_file "$BRAIN_ROOT")"
+  if [ -f "$private_idx" ]; then
+    sed -i "s|${basename}\(.*\)raw|${basename}\1published|" "$private_idx" 2>/dev/null || true
+  fi
+
+  echo "Published: $file → $dest_dir/$basename"
+}
+
+# ---------------------------------------------------------------------------
+# Router
+# ---------------------------------------------------------------------------
+case "$CMD" in
+  init)      cmd_init "$@" ;;
+  capture)   cmd_capture "$@" ;;
+  preflight) cmd_preflight "$@" ;;
+  list)      cmd_list "$@" ;;
+  promote)   cmd_promote "$@" ;;
+  publish)   cmd_publish "$@" ;;
+  ""|help|--help|-h)
+    echo "brainctl — knowledge management CLI"
+    echo ""
+    echo "Commands:"
+    echo "  init [--global <path>]      Scaffold a brain (local or global)"
+    echo "  init --type <type>          Also write .envrc template (private|split-private|split-public)"
+    echo "  capture [--global] \"task\"   Capture a learning (local or global brain)"
+    echo "  preflight \"query\"           Search before acting (local + global)"
+    echo "  list [--global]             Show index"
+    echo "  list --tag <tag>            Filter index by tag"
+    echo "  list --status <status>      Filter index by status (raw|promoted|published)"
+    echo "  promote <file>              Promote learning to rules/docs"
+    echo "  publish <file>              Sanitize + copy to public brain"
+    echo ""
+    echo "Environment:"
+    echo "  BRAIN_GLOBAL   global brain root (default: ~/Programming/programs/brain)"
+    echo "  BRAIN_ROOT     local brain root  (default: current directory)"
+    echo "  BRAIN_PUBLIC   public brain root (unset = no public brain)"
+    echo "  BRAIN_CONTEXT  platform context  (kubernetes|raspberry-pi|synology|vps|nixos|dev)"
+    echo "  BRAIN_REPO     repository name"
+    ;;
+  *)
+    echo "Unknown command: $CMD" >&2
+    echo "Run 'brainctl help' for usage." >&2
+    exit 1
+    ;;
+esac
