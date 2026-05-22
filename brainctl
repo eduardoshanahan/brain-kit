@@ -411,51 +411,107 @@ cmd_list() {
 # promote
 # ---------------------------------------------------------------------------
 cmd_promote() {
-  local file="$1"
+  local file=""
+  local to=""
+  local no_edit=false
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --to)      to="$2"; shift ;;
+      --to=*)    to="${1#--to=}" ;;
+      --no-edit) no_edit=true ;;
+      *)
+        if [ -z "$file" ]; then
+          file="$1"
+        else
+          echo "Unknown option: $1" >&2
+          exit 1
+        fi
+        ;;
+    esac
+    shift
+  done
+
   if [ -z "$file" ] || [ ! -f "$file" ]; then
-    echo "Usage: brainctl promote <investigation-file>" >&2
+    echo "Usage: brainctl promote <investigation-file> [--to <target>] [--no-edit]" >&2
+    echo "" >&2
+    echo "Targets for --to:" >&2
+    echo "  known-mistakes   Local .brain/known-mistakes.md" >&2
+    echo "  constraints      Local .brain/constraints.md" >&2
+    echo "  global           Global brain known-mistakes.md" >&2
+    echo "  decisions        docs/decisions/<slug>-decision.md" >&2
+    echo "  runbooks         docs/runbooks/<slug>-runbook.md" >&2
+    echo "" >&2
+    echo "Omit --to for interactive mode (requires a terminal)." >&2
     exit 1
   fi
 
-  echo "Opening $file for review..."
-  ${EDITOR:-vi} "$file"
-
-  echo ""
-  echo "Promote to:"
-  echo "  1) Local .brain/known-mistakes.md"
-  echo "  2) Local .brain/constraints.md"
-  echo "  3) Global brain (~/Programming/programs/brain/.brain/)"
-  echo "  4) docs/decisions/"
-  echo "  5) docs/runbooks/"
-  echo "  q) Cancel"
-  printf "Choice: "
-  read -r choice
+  if ! $no_edit; then
+    if [ -t 0 ]; then
+      echo "Opening $file for review..."
+      ${EDITOR:-vi} "$file"
+    else
+      echo "Skipping editor (no terminal). Use --no-edit to suppress this notice."
+    fi
+  fi
 
   local target_file=""
+  local choice="$to"
+
+  if [ -z "$choice" ]; then
+    if [ ! -t 0 ]; then
+      echo "Error: --to <target> is required when stdin is not a terminal." >&2
+      echo "Run 'brainctl promote --help' for target options." >&2
+      exit 1
+    fi
+    echo ""
+    echo "Promote to:"
+    echo "  1) known-mistakes   Local .brain/known-mistakes.md"
+    echo "  2) constraints      Local .brain/constraints.md"
+    echo "  3) global           Global brain known-mistakes.md"
+    echo "  4) decisions        docs/decisions/"
+    echo "  5) runbooks         docs/runbooks/"
+    echo "  q) Cancel"
+    printf "Choice: "
+    read -r choice
+  fi
+
+  local slug
+  slug=$(slugify "$(basename "$file" .md)")
+
   case "$choice" in
-    1) target_file="$BRAIN_ROOT/.brain/known-mistakes.md" ;;
-    2) target_file="$BRAIN_ROOT/.brain/constraints.md" ;;
-    3) target_file="$BRAIN_GLOBAL/.brain/known-mistakes.md" ;;
-    4)
-      local slug
-      slug=$(slugify "$(basename "$file" .md)")
+    1|known-mistakes)
+      target_file="$BRAIN_ROOT/.brain/known-mistakes.md"
+      ;;
+    2|constraints)
+      target_file="$BRAIN_ROOT/.brain/constraints.md"
+      ;;
+    3|global)
+      target_file="$BRAIN_GLOBAL/.brain/known-mistakes.md"
+      ;;
+    4|decisions)
       target_file="$BRAIN_ROOT/docs/decisions/${slug}-decision.md"
       mkdir -p "$BRAIN_ROOT/docs/decisions"
       ;;
-    5)
-      local slug
-      slug=$(slugify "$(basename "$file" .md)")
+    5|runbooks)
       target_file="$BRAIN_ROOT/docs/runbooks/${slug}-runbook.md"
       mkdir -p "$BRAIN_ROOT/docs/runbooks"
       ;;
     q|Q) echo "Cancelled."; return ;;
-    *) echo "Invalid choice."; return ;;
+    *) echo "Invalid choice: $choice"; exit 1 ;;
   esac
 
-  echo ""
-  echo "Opening $target_file alongside investigation..."
-  echo "Copy relevant content manually, then save and close."
-  ${EDITOR:-vi} "$target_file"
+  if ! $no_edit; then
+    if [ -t 0 ]; then
+      echo ""
+      echo "Opening $target_file alongside investigation..."
+      echo "Copy relevant content manually, then save and close."
+      ${EDITOR:-vi} "$target_file"
+    else
+      echo "Target: $target_file"
+      echo "Tip: edit it directly or re-run with a terminal to open both files side by side."
+    fi
+  fi
 
   # Update status in local index
   local basename
@@ -553,7 +609,9 @@ case "$CMD" in
     echo "  list [--global]             Show index"
     echo "  list --tag <tag>            Filter index by tag"
     echo "  list --status <status>      Filter index by status (raw|promoted|published)"
-    echo "  promote <file>              Promote learning to rules/docs"
+    echo "  promote <file> [--to <target>] [--no-edit]"
+  echo "                              Promote learning to rules/docs"
+  echo "                              Targets: known-mistakes, constraints, global, decisions, runbooks"
     echo "  publish <file>              Sanitize + copy to public brain"
     echo ""
     echo "Environment:"
