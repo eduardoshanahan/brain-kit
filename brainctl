@@ -137,9 +137,9 @@ MISTAKES
     echo "Created: $base/.brain/known-mistakes.md"
   fi
 
-  # docs/
-  mkdir -p "$base/docs/decisions" "$base/docs/runbooks"
-  echo "Created: $base/docs/decisions/ and $base/docs/runbooks/"
+  # brain docs (kept under .brain/ to avoid colliding with project docs/)
+  mkdir -p "$base/.brain/decisions" "$base/.brain/runbooks"
+  echo "Created: $base/.brain/decisions/ and $base/.brain/runbooks/"
 
   # .envrc template
   if [ -n "$project_type" ] && [ ! -f "$base/.envrc" ]; then
@@ -439,8 +439,8 @@ cmd_promote() {
     echo "  known-mistakes   Local .brain/known-mistakes.md" >&2
     echo "  constraints      Local .brain/constraints.md" >&2
     echo "  global           Global brain known-mistakes.md" >&2
-    echo "  decisions        docs/decisions/<slug>-decision.md" >&2
-    echo "  runbooks         docs/runbooks/<slug>-runbook.md" >&2
+    echo "  decisions        .brain/decisions/<slug>-decision.md" >&2
+    echo "  runbooks         .brain/runbooks/<slug>-runbook.md" >&2
     echo "" >&2
     echo "Omit --to for interactive mode (requires a terminal)." >&2
     exit 1
@@ -469,8 +469,8 @@ cmd_promote() {
     echo "  1) known-mistakes   Local .brain/known-mistakes.md"
     echo "  2) constraints      Local .brain/constraints.md"
     echo "  3) global           Global brain known-mistakes.md"
-    echo "  4) decisions        docs/decisions/"
-    echo "  5) runbooks         docs/runbooks/"
+    echo "  4) decisions        .brain/decisions/"
+    echo "  5) runbooks         .brain/runbooks/"
     echo "  q) Cancel"
     printf "Choice: "
     read -r choice
@@ -490,12 +490,12 @@ cmd_promote() {
       target_file="$BRAIN_GLOBAL/.brain/known-mistakes.md"
       ;;
     4|decisions)
-      target_file="$BRAIN_ROOT/docs/decisions/${slug}-decision.md"
-      mkdir -p "$BRAIN_ROOT/docs/decisions"
+      target_file="$BRAIN_ROOT/.brain/decisions/${slug}-decision.md"
+      mkdir -p "$BRAIN_ROOT/.brain/decisions"
       ;;
     5|runbooks)
-      target_file="$BRAIN_ROOT/docs/runbooks/${slug}-runbook.md"
-      mkdir -p "$BRAIN_ROOT/docs/runbooks"
+      target_file="$BRAIN_ROOT/.brain/runbooks/${slug}-runbook.md"
+      mkdir -p "$BRAIN_ROOT/.brain/runbooks"
       ;;
     q|Q) echo "Cancelled."; return ;;
     *) echo "Invalid choice: $choice"; exit 1 ;;
@@ -611,7 +611,7 @@ case "$CMD" in
     echo "  list --status <status>      Filter index by status (raw|promoted|published)"
     echo "  promote <file> [--to <target>] [--no-edit]"
   echo "                              Promote learning to rules/docs"
-  echo "                              Targets: known-mistakes, constraints, global, decisions, runbooks"
+  echo "                              Targets: known-mistakes, constraints, global, decisions (.brain/decisions/), runbooks (.brain/runbooks/)"
     echo "  publish <file>              Sanitize + copy to public brain"
     echo ""
     echo "Environment:"
