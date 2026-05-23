@@ -145,12 +145,13 @@ MISTAKES
   if [ -n "$project_type" ] && [ ! -f "$base/.envrc" ]; then
     case "$project_type" in
       private)
-        cat > "$base/.envrc" <<'ENVRC'
+        cat > "$base/.envrc" <<ENVRC
 # Brain system environment — fully private repo
 # Run: direnv allow
 
-export BRAIN_GLOBAL=~/Programming/programs/brain
-export BRAIN_ROOT=$(pwd)
+# BRAIN_GLOBAL: path to your global brain — update if different on this machine
+export BRAIN_GLOBAL=${BRAIN_GLOBAL}
+export BRAIN_ROOT=\$(pwd)
 export BRAIN_PUBLIC=""
 export BRAIN_CONTEXT=dev
 export BRAIN_REPO=my-repo  # replace with your repo name
@@ -168,7 +169,8 @@ ENVRC
 # Brain system environment — private directory of a split project
 # Run: direnv allow
 
-export BRAIN_GLOBAL=~/Programming/programs/brain
+# BRAIN_GLOBAL: path to your global brain — update if different on this machine
+export BRAIN_GLOBAL=${BRAIN_GLOBAL}
 export BRAIN_ROOT=\$(pwd)
 export BRAIN_PUBLIC=\$(pwd)/../${public_name}
 export BRAIN_CONTEXT=dev
@@ -183,7 +185,8 @@ ENVRC
 # Brain system environment — public directory of a split project
 # Run: direnv allow
 
-export BRAIN_GLOBAL=~/Programming/programs/brain
+# BRAIN_GLOBAL: path to your global brain — update if different on this machine
+export BRAIN_GLOBAL=${BRAIN_GLOBAL}
 export BRAIN_ROOT=\$(pwd)/../${private_name}
 export BRAIN_PUBLIC=\$(pwd)
 export BRAIN_CONTEXT=dev
