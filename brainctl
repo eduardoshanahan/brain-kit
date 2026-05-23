@@ -157,27 +157,37 @@ export BRAIN_REPO=my-repo  # replace with your repo name
 ENVRC
         ;;
       split-private)
-        cat > "$base/.envrc" <<'ENVRC'
+        local dirname public_name
+        dirname="$(basename "$base")"
+        public_name="${dirname%-private}"
+        if [ "$public_name" = "$dirname" ]; then
+          echo "Warning: directory '$dirname' does not end in '-private'; defaulting public sibling to '${dirname}-public'" >&2
+          public_name="${dirname}-public"
+        fi
+        cat > "$base/.envrc" <<ENVRC
 # Brain system environment — private directory of a split project
 # Run: direnv allow
 
 export BRAIN_GLOBAL=~/Programming/programs/brain
-export BRAIN_ROOT=$(pwd)
-export BRAIN_PUBLIC=$(pwd)/../public   # public sibling directory
+export BRAIN_ROOT=\$(pwd)
+export BRAIN_PUBLIC=\$(pwd)/../${public_name}
 export BRAIN_CONTEXT=dev
-export BRAIN_REPO=my-project           # replace with your project name
+export BRAIN_REPO=${public_name}
 ENVRC
         ;;
       split-public)
-        cat > "$base/.envrc" <<'ENVRC'
+        local dirname private_name
+        dirname="$(basename "$base")"
+        private_name="${dirname}-private"
+        cat > "$base/.envrc" <<ENVRC
 # Brain system environment — public directory of a split project
 # Run: direnv allow
 
 export BRAIN_GLOBAL=~/Programming/programs/brain
-export BRAIN_ROOT=$(pwd)/../private    # ALL captures go to private brain
-export BRAIN_PUBLIC=$(pwd)
+export BRAIN_ROOT=\$(pwd)/../${private_name}
+export BRAIN_PUBLIC=\$(pwd)
 export BRAIN_CONTEXT=dev
-export BRAIN_REPO=my-project           # replace with your project name
+export BRAIN_REPO=${dirname}
 ENVRC
         ;;
       *)
