@@ -255,7 +255,10 @@ cmd_capture() {
   slug=$(slugify "$task")
   file="$(investigations_dir "$base")/${date}-${slug}.md"
 
-  cat > "$file" <<EOF
+  if [ -f "$file" ]; then
+    echo "Exists: $file"
+  else
+    cat > "$file" <<EOF
 # Task: $task
 
 ## Status
@@ -279,19 +282,22 @@ $BRAIN_CONTEXT
 
 ## Candidate for promotion
 EOF
-
-  local ai_result summary tags
-  ai_result=$(ai_summarize "$task")
-  summary=$(echo "$ai_result" | cut -d'|' -f1)
-  tags=$(echo "$ai_result" | cut -d'|' -f4)
+    echo "Created: $file"
+  fi
 
   local rel_file="${date}-${slug}.md"
-  echo "| ${date} | ${rel_file} | ${summary} | ${tags} | ${BRAIN_CONTEXT} | ${BRAIN_REPO} | raw |" >> "$(index_file "$base")"
-
-  echo "Created: $file"
-  if command -v llm >/dev/null 2>&1; then
-    echo "Summary: $summary"
-    echo "Tags:    $tags"
+  local idx
+  idx="$(index_file "$base")"
+  if ! grep -qF "| ${rel_file} |" "$idx" 2>/dev/null; then
+    local ai_result summary tags
+    ai_result=$(ai_summarize "$task")
+    summary=$(echo "$ai_result" | cut -d'|' -f1)
+    tags=$(echo "$ai_result" | cut -d'|' -f4)
+    echo "| ${date} | ${rel_file} | ${summary} | ${tags} | ${BRAIN_CONTEXT} | ${BRAIN_REPO} | raw |" >> "$idx"
+    if command -v llm >/dev/null 2>&1; then
+      echo "Summary: $summary"
+      echo "Tags:    $tags"
+    fi
   fi
 }
 
