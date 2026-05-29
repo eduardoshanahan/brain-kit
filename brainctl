@@ -256,7 +256,11 @@ cmd_capture() {
   file="$(investigations_dir "$base")/${date}-${slug}.md"
 
   if [ -f "$file" ]; then
-    echo "Exists: $file"
+    echo "Exists (do not overwrite): $file"
+    echo "Current content:"
+    echo "---"
+    cat "$file"
+    echo "---"
   else
     cat > "$file" <<EOF
 # Task: $task
