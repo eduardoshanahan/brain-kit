@@ -107,6 +107,12 @@ export BRAIN_CONTEXT=kubernetes           # platform context (see below)
 export BRAIN_REPO=nix-cluster            # repo name
 ```
 
+### BRAIN_REPO
+
+`BRAIN_REPO` is a plain string label used to scope `preflight` and `capture` to a specific project. It has no relationship to git — it does not need to match the git remote name, repository URL, or directory name. It only needs to be consistent across all captures in the same project so that `preflight` can find past investigations by repo.
+
+For split projects, both the private and public directories should use the same `BRAIN_REPO` value (typically the public repo name, e.g. `brain-kit`).
+
 ### BRAIN_CONTEXT values
 
 | Value | Use for |
