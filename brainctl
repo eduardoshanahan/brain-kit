@@ -137,6 +137,36 @@ MISTAKES
     echo "Created: $base/.brain/known-mistakes.md"
   fi
 
+  # Compute optional global brain line
+  local global_agent_line=""
+  if [ -n "$BRAIN_GLOBAL" ] && [ -f "$BRAIN_GLOBAL/.brain/AGENT.md" ]; then
+    local global_rel
+    global_rel="${BRAIN_GLOBAL/#$HOME/\~}"
+    global_agent_line="Also read \`${global_rel}/.brain/AGENT.md\` for global cross-project context."
+  fi
+
+  # CLAUDE.md — Claude Code entry point
+  if [ ! -f "$base/CLAUDE.md" ]; then
+    {
+      echo "# Claude Instructions"
+      echo ""
+      echo "Read \`.brain/AGENT.md\` for repo-specific agent instructions."
+      [ -n "$global_agent_line" ] && echo "$global_agent_line"
+    } > "$base/CLAUDE.md"
+    echo "Created: $base/CLAUDE.md"
+  fi
+
+  # AGENTS.md — OpenAI Codex / other agents entry point
+  if [ ! -f "$base/AGENTS.md" ]; then
+    {
+      echo "# Agent Instructions"
+      echo ""
+      echo "Read \`.brain/AGENT.md\` for repo-specific agent instructions."
+      [ -n "$global_agent_line" ] && echo "$global_agent_line"
+    } > "$base/AGENTS.md"
+    echo "Created: $base/AGENTS.md"
+  fi
+
   # brain docs (kept under .brain/ to avoid colliding with project docs/)
   mkdir -p "$base/.brain/decisions" "$base/.brain/runbooks"
   echo "Created: $base/.brain/decisions/ and $base/.brain/runbooks/"
