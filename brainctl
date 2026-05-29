@@ -555,9 +555,26 @@ cmd_promote() {
 # publish
 # ---------------------------------------------------------------------------
 cmd_publish() {
-  local file="$1"
+  local file=""
+  local no_edit=false
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-edit) no_edit=true ;;
+      *)
+        if [ -z "$file" ]; then
+          file="$1"
+        else
+          echo "Unknown option: $1" >&2
+          exit 1
+        fi
+        ;;
+    esac
+    shift
+  done
+
   if [ -z "$file" ] || [ ! -f "$file" ]; then
-    echo "Usage: brainctl publish <investigation-file>" >&2
+    echo "Usage: brainctl publish <investigation-file> [--no-edit]" >&2
     exit 1
   fi
 
@@ -569,17 +586,22 @@ cmd_publish() {
 
   ensure_structure "$BRAIN_PUBLIC"
 
-  echo "IMPORTANT: Review this file for sensitive content before publishing."
-  echo "Remove any secrets, internal IPs, credentials, or private details."
-  echo ""
-  echo "Opening file for sanitization review..."
-  ${EDITOR:-vi} "$file"
-
-  printf "Publish this file to %s? [y/N] " "$BRAIN_PUBLIC"
-  read -r confirm
-  if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "Cancelled."
-    return
+  if ! $no_edit; then
+    echo "IMPORTANT: Review this file for sensitive content before publishing."
+    echo "Remove any secrets, internal IPs, credentials, or private details."
+    echo ""
+    if [ -t 0 ]; then
+      echo "Opening file for sanitization review..."
+      ${EDITOR:-vi} "$file"
+      printf "Publish this file to %s? [y/N] " "$BRAIN_PUBLIC"
+      read -r confirm
+      if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        echo "Cancelled."
+        return
+      fi
+    else
+      echo "Skipping editor (no terminal). Use --no-edit to suppress this notice."
+    fi
   fi
 
   local dest_dir
@@ -635,7 +657,7 @@ case "$CMD" in
     echo "  promote <file> [--to <target>] [--no-edit]"
   echo "                              Promote learning to rules/docs"
   echo "                              Targets: known-mistakes, constraints, global, decisions (.brain/decisions/), runbooks (.brain/runbooks/)"
-    echo "  publish <file>              Sanitize + copy to public brain"
+    echo "  publish <file> [--no-edit]  Sanitize + copy to public brain"
     echo ""
     echo "Environment:"
     echo "  BRAIN_GLOBAL   global brain root (default: ~/Programming/programs/brain)"
