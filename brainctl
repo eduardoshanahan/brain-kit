@@ -412,18 +412,22 @@ cmd_list() {
     return
   fi
 
-  local output
-  output=$(cat "$idx")
+  local preamble table_header data_rows
+  preamble=$(grep -v '^|' "$idx")
+  table_header=$(grep '^|' "$idx" | head -2)
+  data_rows=$(grep '^|' "$idx" | tail -n +3)
 
   if [ -n "$filter_tag" ]; then
-    output=$(echo "$output" | head -2; echo "$output" | tail -n +3 | grep -i "$filter_tag" || true)
+    data_rows=$(echo "$data_rows" | grep -i "$filter_tag" || true)
   fi
 
   if [ -n "$filter_status" ]; then
-    output=$(echo "$output" | head -2; echo "$output" | tail -n +3 | grep -i "$filter_status" || true)
+    data_rows=$(echo "$data_rows" | grep -i "$filter_status" || true)
   fi
 
-  echo "$output"
+  [ -n "$preamble" ] && printf '%s\n\n' "$preamble"
+  printf '%s\n' "$table_header"
+  [ -n "$data_rows" ] && printf '%s\n' "$data_rows"
 }
 
 # ---------------------------------------------------------------------------
