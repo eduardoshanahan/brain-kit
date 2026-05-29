@@ -459,11 +459,12 @@ cmd_promote() {
     echo "Usage: brainctl promote <investigation-file> [--to <target>] [--no-edit]" >&2
     echo "" >&2
     echo "Targets for --to:" >&2
-    echo "  known-mistakes   Local .brain/known-mistakes.md" >&2
-    echo "  constraints      Local .brain/constraints.md" >&2
-    echo "  global           Global brain known-mistakes.md" >&2
-    echo "  decisions        .brain/decisions/<slug>-decision.md" >&2
-    echo "  runbooks         .brain/runbooks/<slug>-runbook.md" >&2
+    echo "  known-mistakes      Local .brain/known-mistakes.md" >&2
+    echo "  constraints         Local .brain/constraints.md" >&2
+    echo "  global              Global brain known-mistakes.md" >&2
+    echo "  global-constraints  Global brain constraints.md" >&2
+    echo "  decisions           .brain/decisions/<slug>-decision.md" >&2
+    echo "  runbooks            .brain/runbooks/<slug>-runbook.md" >&2
     echo "" >&2
     echo "Omit --to for interactive mode (requires a terminal)." >&2
     exit 1
@@ -489,11 +490,12 @@ cmd_promote() {
     fi
     echo ""
     echo "Promote to:"
-    echo "  1) known-mistakes   Local .brain/known-mistakes.md"
-    echo "  2) constraints      Local .brain/constraints.md"
-    echo "  3) global           Global brain known-mistakes.md"
-    echo "  4) decisions        .brain/decisions/"
-    echo "  5) runbooks         .brain/runbooks/"
+    echo "  1) known-mistakes      Local .brain/known-mistakes.md"
+    echo "  2) constraints         Local .brain/constraints.md"
+    echo "  3) global              Global brain known-mistakes.md"
+    echo "  4) global-constraints  Global brain constraints.md"
+    echo "  5) decisions           .brain/decisions/"
+    echo "  6) runbooks            .brain/runbooks/"
     echo "  q) Cancel"
     printf "Choice: "
     read -r choice
@@ -512,11 +514,14 @@ cmd_promote() {
     3|global)
       target_file="$BRAIN_GLOBAL/.brain/known-mistakes.md"
       ;;
-    4|decisions)
+    4|global-constraints)
+      target_file="$BRAIN_GLOBAL/.brain/constraints.md"
+      ;;
+    5|decisions)
       target_file="$BRAIN_ROOT/.brain/decisions/${slug}-decision.md"
       mkdir -p "$BRAIN_ROOT/.brain/decisions"
       ;;
-    5|runbooks)
+    6|runbooks)
       target_file="$BRAIN_ROOT/.brain/runbooks/${slug}-runbook.md"
       mkdir -p "$BRAIN_ROOT/.brain/runbooks"
       ;;
@@ -656,7 +661,7 @@ case "$CMD" in
     echo "  list --status <status>      Filter index by status (raw|promoted|published)"
     echo "  promote <file> [--to <target>] [--no-edit]"
   echo "                              Promote learning to rules/docs"
-  echo "                              Targets: known-mistakes, constraints, global, decisions (.brain/decisions/), runbooks (.brain/runbooks/)"
+  echo "                              Targets: known-mistakes, constraints, global, global-constraints, decisions (.brain/decisions/), runbooks (.brain/runbooks/)"
     echo "  publish <file> [--no-edit]  Sanitize + copy to public brain"
     echo ""
     echo "Environment:"
