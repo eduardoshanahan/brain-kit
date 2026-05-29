@@ -41,7 +41,6 @@ Private. Never pushed to a public remote. Contains cross-project learnings.
     constraints.md     # global constraints
     investigations/    # cross-project learnings
     INDEX.md           # global index
-  docs/
     decisions/         # cross-project architectural decisions
     runbooks/          # reusable procedures
   CLAUDE.md            # adapter: "Read .brain/AGENT.md"
@@ -60,7 +59,6 @@ Private. Never pushed to a public remote. Contains cross-project learnings.
     constraints.md
     investigations/
     INDEX.md
-  docs/
     decisions/
     runbooks/
   CLAUDE.md            # adapter
@@ -163,8 +161,8 @@ Opens the file in `$EDITOR`, then asks where to promote:
 1. Local `.brain/known-mistakes.md`
 2. Local `.brain/constraints.md`
 3. Global brain (`~/Programming/programs/brain/.brain/known-mistakes.md`)
-4. `docs/decisions/`
-5. `docs/runbooks/`
+4. `.brain/decisions/`
+5. `.brain/runbooks/`
 
 ### `publish`
 
@@ -295,8 +293,8 @@ brainctl promote <file>
   → .brain/known-mistakes.md                  (errors to avoid)
   → .brain/constraints.md                     (rules to follow)
   → global brain                              (cross-project learning)
-  → docs/decisions/                           (architectural decisions)
-  → docs/runbooks/                            (repeatable procedures)
+  → .brain/decisions/                         (architectural decisions)
+  → .brain/runbooks/                          (repeatable procedures)
   ↓
 brainctl publish <file>              (split projects only)
   → public/.brain/investigations/             (sanitized, safe for GitHub)
