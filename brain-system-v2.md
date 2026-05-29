@@ -135,7 +135,7 @@ brainctl capture "task name"           # → local brain
 brainctl capture --global "task name"  # → global brain
 ```
 
-Creates `YYYY-MM-DD-task-name.md` in the target `.brain/investigations/`. Appends a row to `INDEX.md` with AI-generated summary and tags (falls back gracefully if `llm` is not installed).
+Creates `YYYY-MM-DD-task-name.md` in the target `.brain/investigations/`. Appends a row to `INDEX.md` with AI-generated summary and tags (falls back gracefully if `llm` is not installed). If the brain directory is a git repository, automatically commits the new files. If a remote is configured, also pushes.
 
 ### `preflight`
 

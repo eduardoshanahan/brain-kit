@@ -303,6 +303,16 @@ EOF
       echo "Tags:    $tags"
     fi
   fi
+
+  if git -C "$base" rev-parse --git-dir >/dev/null 2>&1; then
+    git -C "$base" add -A
+    git -C "$base" commit -m "brain: capture $task" --quiet
+    echo "Committed: $base"
+    if git -C "$base" remote | grep -q .; then
+      git -C "$base" push --quiet
+      echo "Pushed: $base"
+    fi
+  fi
 }
 
 # ---------------------------------------------------------------------------
