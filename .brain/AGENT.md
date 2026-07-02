@@ -1,6 +1,6 @@
-# Agent Instructions — brain-kit (public)
+# Agent Instructions — brain-kit
 
-This file extends the global instructions at `~/Programming/programs/brain/.brain/AGENT.md`.
+This file extends the global instructions at `~/Programming/brain/.brain/AGENT.md`.
 
 ---
 
@@ -9,15 +9,6 @@ This file extends the global instructions at `~/Programming/programs/brain/.brai
 - **BRAIN_CONTEXT**: dev
 - **BRAIN_REPO**: brain-kit
 - **Purpose**: Portable brain system implementation — the brainctl CLI, templates, and documentation. What people clone to bootstrap a brain for a new project or client.
-- **Private counterpart**: `../brain-kit-private/` (never pushed to public remotes)
-
----
-
-## Public Brain Rules
-
-- This .brain/ directory is pushed to public remotes — never add sensitive content here
-- Raw investigations live in `../brain-kit-private/.brain/` (BRAIN_ROOT points there)
-- Only publish content here via `brainctl publish`
 
 ---
 
