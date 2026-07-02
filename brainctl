@@ -390,10 +390,10 @@ cmd_preflight() {
     fi
   fi
 
-  # 2. Global fallthrough (always search global, filtered by context)
+  # 2. Global fallthrough — skip if same index as local (already searched above)
   local global_idx
   global_idx="$(index_file "$BRAIN_GLOBAL")"
-  if [ -f "$global_idx" ]; then
+  if [ -f "$global_idx" ] && [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
     local global_matches
     global_matches=$(
       _r=$(cat "$global_idx")
