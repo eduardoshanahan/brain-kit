@@ -362,7 +362,11 @@ cmd_preflight() {
   local_idx="$(index_file "$BRAIN_ROOT")"
   if [ -f "$local_idx" ]; then
     local local_matches
-    local_matches=$(grep -i "$query" "$local_idx" | grep -i "$BRAIN_CONTEXT" | grep -i "$BRAIN_REPO" || true)
+    local_matches=$(
+      _r=$(cat "$local_idx")
+      for _w in $query; do _r=$(echo "$_r" | grep -i "$_w" || true); done
+      echo "$_r" | grep -i "$BRAIN_CONTEXT" | grep -i "$BRAIN_REPO" || true
+    )
     if [ -n "$local_matches" ]; then
       found=true
       echo "## Local matches (context: $BRAIN_CONTEXT, repo: $BRAIN_REPO)"
@@ -391,7 +395,11 @@ cmd_preflight() {
   global_idx="$(index_file "$BRAIN_GLOBAL")"
   if [ -f "$global_idx" ]; then
     local global_matches
-    global_matches=$(grep -i "$query" "$global_idx" | grep -i "$BRAIN_CONTEXT" || true)
+    global_matches=$(
+      _r=$(cat "$global_idx")
+      for _w in $query; do _r=$(echo "$_r" | grep -i "$_w" || true); done
+      echo "$_r" | grep -i "$BRAIN_CONTEXT" || true
+    )
     if [ -n "$global_matches" ]; then
       found=true
       echo "## Global matches (context: $BRAIN_CONTEXT)"
