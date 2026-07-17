@@ -58,6 +58,31 @@ ai_summarize() {
   fi
 }
 
+# Grep a markdown table file with AND-filter across query words; strip header + separator rows.
+search_table() {
+  local file="$1"; shift
+  [ -f "$file" ] || return 0
+  local results
+  results=$(cat "$file")
+  for w in "$@"; do results=$(echo "$results" | grep -i "$w" || true); done
+  echo "$results" | grep "^|" | grep -v -- "^|[-: |]*$" \
+    | grep -Ev "^\| (Symptom|Constraint|Date)\b" || true
+}
+
+# Find runbooks where all query words appear in the filename or file content.
+search_runbooks() {
+  local dir="$1"; shift
+  [ -d "$dir" ] || return 0
+  find "$dir" -maxdepth 1 -name "*.md" | while read -r f; do
+    local all_match=true
+    for w in "$@"; do
+      # shellcheck disable=SC2094
+      { echo "$(basename "$f")"; cat "$f"; } | grep -qi "$w" || { all_match=false; break; }
+    done
+    $all_match && echo "$f" || true
+  done
+}
+
 # ---------------------------------------------------------------------------
 # init
 # ---------------------------------------------------------------------------
@@ -357,6 +382,61 @@ cmd_preflight() {
 
   local found=false
 
+  # ── Known Mistakes ──────────────────────────────────────────────────────────
+  local km_out=""
+  local km_local
+  km_local=$(search_table "$(brain_dir "$BRAIN_ROOT")/known-mistakes.md" $query)
+  km_out="$km_local"
+  if [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
+    local km_global
+    km_global=$(search_table "$(brain_dir "$BRAIN_GLOBAL")/known-mistakes.md" $query)
+    km_out="${km_out}${km_global}"
+  fi
+  if [ -n "$km_out" ]; then
+    found=true
+    echo "## Known Mistakes"
+    echo "$km_out"
+    echo ""
+  fi
+
+  # ── Runbooks ────────────────────────────────────────────────────────────────
+  local rb_out="" _rb_part
+  _rb_part=$(search_runbooks "$(brain_dir "$BRAIN_ROOT")/runbooks" $query)
+  [ -n "$_rb_part" ] && rb_out="${rb_out}${_rb_part}"$'\n'
+  _rb_part=$(search_runbooks "$BRAIN_ROOT/docs/runbooks" $query)
+  [ -n "$_rb_part" ] && rb_out="${rb_out}${_rb_part}"$'\n'
+  if [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
+    _rb_part=$(search_runbooks "$(brain_dir "$BRAIN_GLOBAL")/runbooks" $query)
+    [ -n "$_rb_part" ] && rb_out="${rb_out}${_rb_part}"$'\n'
+    _rb_part=$(search_runbooks "$BRAIN_GLOBAL/docs/runbooks" $query)
+    [ -n "$_rb_part" ] && rb_out="${rb_out}${_rb_part}"$'\n'
+  fi
+  if [ -n "$rb_out" ]; then
+    found=true
+    echo "## Runbooks"
+    echo "$rb_out" | grep -v "^$" | while read -r f; do echo "- $f"; done
+    echo ""
+  fi
+
+  # ── Constraints ─────────────────────────────────────────────────────────────
+  local cs_out=""
+  local cs_local
+  cs_local=$(search_table "$(brain_dir "$BRAIN_ROOT")/constraints.md" $query)
+  cs_out="$cs_local"
+  if [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
+    local cs_global
+    cs_global=$(search_table "$(brain_dir "$BRAIN_GLOBAL")/constraints.md" $query)
+    cs_out="${cs_out}${cs_global}"
+  fi
+  if [ -n "$cs_out" ]; then
+    found=true
+    echo "## Constraints"
+    echo "$cs_out"
+    echo ""
+  fi
+
+  # ── Past Investigations ─────────────────────────────────────────────────────
+
   # 1. Local scoped search
   local local_idx
   local_idx="$(index_file "$BRAIN_ROOT")"
@@ -423,7 +503,7 @@ cmd_preflight() {
   fi
 
   if ! $found; then
-    echo "No past investigations found for: $query"
+    echo "No past knowledge found for: $query"
     echo "Context: $BRAIN_CONTEXT | Repo: $BRAIN_REPO"
   fi
 }
