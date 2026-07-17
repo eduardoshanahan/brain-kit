@@ -69,6 +69,46 @@ search_table() {
     | grep -Ev "^\| (Symptom|Constraint|Date)\b" || true
 }
 
+# Find "## Heading" sections (heading through the next "## " or EOF) where all query
+# words appear anywhere in the section body. search_table only sees literal markdown
+# table rows ("^|"); most constraints.md/known-mistakes.md content is prose/bullet
+# text under "## " headings (e.g. "## Mistake: ..."), which search_table can never
+# match regardless of query. This is the same knowledge, in the other format.
+search_sections() {
+  local file="$1"; shift
+  [ -f "$file" ] || return 0
+  [ "$#" -eq 0 ] && return 0
+
+  local block ok w
+  while IFS= read -r -d $'\0' block; do
+    ok=true
+    for w in "$@"; do
+      echo "$block" | grep -qi -- "$w" || { ok=false; break; }
+    done
+    $ok && printf '%s\0' "$block" || true
+  done < <(awk '
+    BEGIN { block = ""; started = 0 }
+    /^## / {
+      if (started) printf "%s%c", block, 0
+      block = $0 "\n"
+      started = 1
+      next
+    }
+    { if (started) block = block $0 "\n" }
+    END { if (started) printf "%s%c", block, 0 }
+  ' "$file")
+}
+
+# Join search_sections' NUL-delimited blocks into one blank-line-separated string.
+sections_joined() {
+  local file="$1"; shift
+  local out="" block first=true
+  while IFS= read -r -d $'\0' block; do
+    if $first; then out="$block"; first=false; else out="${out}"$'\n'"${block}"; fi
+  done < <(search_sections "$file" "$@")
+  echo -n "$out"
+}
+
 # Find runbooks where all query words appear in the filename or file content.
 search_runbooks() {
   local dir="$1"; shift
@@ -387,10 +427,16 @@ cmd_preflight() {
   local km_local
   km_local=$(search_table "$(brain_dir "$BRAIN_ROOT")/known-mistakes.md" $query)
   km_out="$km_local"
+  local km_local_sections
+  km_local_sections=$(sections_joined "$(brain_dir "$BRAIN_ROOT")/known-mistakes.md" $query)
+  [ -n "$km_local_sections" ] && km_out="${km_out}"$'\n'"${km_local_sections}"
   if [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
     local km_global
     km_global=$(search_table "$(brain_dir "$BRAIN_GLOBAL")/known-mistakes.md" $query)
     km_out="${km_out}${km_global}"
+    local km_global_sections
+    km_global_sections=$(sections_joined "$(brain_dir "$BRAIN_GLOBAL")/known-mistakes.md" $query)
+    [ -n "$km_global_sections" ] && km_out="${km_out}"$'\n'"${km_global_sections}"
   fi
   if [ -n "$km_out" ]; then
     found=true
@@ -423,10 +469,16 @@ cmd_preflight() {
   local cs_local
   cs_local=$(search_table "$(brain_dir "$BRAIN_ROOT")/constraints.md" $query)
   cs_out="$cs_local"
+  local cs_local_sections
+  cs_local_sections=$(sections_joined "$(brain_dir "$BRAIN_ROOT")/constraints.md" $query)
+  [ -n "$cs_local_sections" ] && cs_out="${cs_out}"$'\n'"${cs_local_sections}"
   if [ "$BRAIN_GLOBAL" != "$BRAIN_ROOT" ]; then
     local cs_global
     cs_global=$(search_table "$(brain_dir "$BRAIN_GLOBAL")/constraints.md" $query)
     cs_out="${cs_out}${cs_global}"
+    local cs_global_sections
+    cs_global_sections=$(sections_joined "$(brain_dir "$BRAIN_GLOBAL")/constraints.md" $query)
+    [ -n "$cs_global_sections" ] && cs_out="${cs_out}"$'\n'"${cs_global_sections}"
   fi
   if [ -n "$cs_out" ]; then
     found=true
